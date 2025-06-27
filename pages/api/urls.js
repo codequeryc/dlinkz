@@ -2,9 +2,6 @@ export default async function handler(req, res) {
   if (req.method !== 'GET') return res.status(405).json({ error: 'GET only' });
 
   const { XATA_API_KEY, XATA_URL } = process.env;
-  const { uId } = req.query;
-
-  if (!uId) return res.status(400).json({ error: 'Missing uId' });
 
   try {
     const response = await fetch(`${XATA_URL}/tables/urls/query`, {
@@ -15,16 +12,16 @@ export default async function handler(req, res) {
       },
       body: JSON.stringify({
         filter: {
-          uId: uId, // match exact uId
+          uId: 'ohjx', // Fixed uId
         },
-        page: { size: 1 } // we only need one match
+        page: { size: 1 }
       }),
     });
 
     const data = await response.json();
 
     if (!data.records || data.records.length === 0) {
-      return res.status(404).json({ error: 'No match found' });
+      return res.status(404).json({ error: 'No record found for uId: ohjx' });
     }
 
     const record = data.records[0];
