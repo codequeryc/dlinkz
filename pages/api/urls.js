@@ -31,6 +31,9 @@ export default async function handler(req, res) {
     const redirectCheck = await fetch(originalUrl, {
       method: 'GET',
       redirect: 'follow',
+      headers: {
+        'User-Agent': 'Mozilla/5.0' // prevent bot blocks
+      }
     });
 
     const finalUrl = redirectCheck.url;
@@ -47,8 +50,22 @@ export default async function handler(req, res) {
       });
     }
 
-    // Step 4: Return the (final) URL
-    res.status(200).json({ url: finalUrl });
+    // Step 4: Get the content of the final URL
+    const contentType = redirectCheck.headers.get('content-type');
+
+    if (contentType.includes('application/json')) {
+      const json = await redirectCheck.json();
+      return res.status(200).json({ url: finalUrl, contentType, content: json });
+    } else if (contentType.includes('text') || contentType.includes('html')) {
+      const text = await redirectCheck.text();
+      return res.status(200).json({ url: finalUrl, contentType, content: text });
+    } else {
+      return res.status(200).json({
+        url: finalUrl,
+        contentType,
+        content: '[Non-textual content — not displayed]',
+      });
+    }
 
   } catch (err) {
     res.status(500).json({ error: 'Failed to fetch or update', details: err.message });
