@@ -5,7 +5,7 @@ export default async function handler(req, res) {
 
   try {
     const response = await fetch(`${XATA_URL}/tables/urls/query`, {
-      method: 'POST', // Xata uses POST for queries
+      method: 'POST',
       headers: {
         'Authorization': `Bearer ${XATA_API_KEY}`,
         'Content-Type': 'application/json',
@@ -14,8 +14,10 @@ export default async function handler(req, res) {
     });
 
     const data = await response.json();
-    res.status(200).json(data.records || []);
-  } catch (error) {
-    res.status(500).json({ error: 'Failed to fetch from Xata', details: error.message });
+    const urls = (data.records || []).map(record => record.url).filter(Boolean);
+
+    res.status(200).json(urls);
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to fetch', details: err.message });
   }
 }
