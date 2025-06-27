@@ -10,7 +10,9 @@ export default async function handler(req, res) {
 
   const getRecord = async () => {
     const res = await fetch(`${XATA_URL}/tables/urls/query`, {
-      method: 'POST', headers, body: JSON.stringify({ filter: { uId: 'ohjx' }, page: { size: 1 } })
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ filter: { uId: 'ohjx' }, page: { size: 1 } })
     });
     const data = await res.json();
     return data.records?.[0];
@@ -19,6 +21,9 @@ export default async function handler(req, res) {
   const fetchHtml = async url => (await fetch(url, { headers: uaHeaders })).text();
 
   try {
+    const { q } = req.query;
+    if (!q) return res.status(400).json({ error: 'Missing query param ?q=' });
+
     let record = await getRecord();
     if (!record) return res.status(404).json({ error: 'uId "ohjx" not found' });
 
@@ -29,11 +34,11 @@ export default async function handler(req, res) {
       await fetch(`${XATA_URL}/tables/urls/data/${id}`, {
         method: 'PATCH', headers, body: JSON.stringify({ url: finalUrl })
       });
-      record = await getRecord();
+      record = await getRecord(); // Refresh after update
     }
 
     const baseUrl = record.url.replace(/\/$/, '');
-    const searchUrl = `${baseUrl}/site-1.html?to-search=raid`;
+    const searchUrl = `${baseUrl}/site-1.html?to-search=${encodeURIComponent(q)}`;
     const html = await fetchHtml(searchUrl);
 
     const blocks = [...html.matchAll(/<div class="A2">([\s\S]*?)<\/div>/g)];
