@@ -4,29 +4,53 @@ export default async function handler(req, res) {
   const { XATA_API_KEY, XATA_URL } = process.env;
 
   try {
-    const response = await fetch(`${XATA_URL}/tables/urls/query`, {
+    // Step 1: Fetch record with uId: 'ohjx'
+    const fetchResponse = await fetch(`${XATA_URL}/tables/urls/query`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${XATA_API_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        filter: {
-          uId: 'ohjx', // Fixed uId
-        },
+        filter: { uId: 'ohjx' },
         page: { size: 1 }
       }),
     });
 
-    const data = await response.json();
+    const data = await fetchResponse.json();
+    const record = data.records?.[0];
 
-    if (!data.records || data.records.length === 0) {
-      return res.status(404).json({ error: 'No record found for uId: ohjx' });
+    if (!record) {
+      return res.status(404).json({ error: 'Record with uId "ohjx" not found' });
     }
 
-    const record = data.records[0];
-    res.status(200).json({ url: record.url });
+    const originalUrl = record.url;
+    const recordId = record.id;
+
+    // Step 2: Follow redirects to get final URL
+    const redirectCheck = await fetch(originalUrl, {
+      method: 'GET',
+      redirect: 'follow',
+    });
+
+    const finalUrl = redirectCheck.url;
+
+    // Step 3: If redirected, update Xata
+    if (finalUrl !== originalUrl) {
+      await fetch(`${XATA_URL}/tables/urls/data/${recordId}`, {
+        method: 'PATCH',
+        headers: {
+          'Authorization': `Bearer ${XATA_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url: finalUrl }),
+      });
+    }
+
+    // Step 4: Return the (final) URL
+    res.status(200).json({ url: finalUrl });
+
   } catch (err) {
-    res.status(500).json({ error: 'Failed to fetch', details: err.message });
+    res.status(500).json({ error: 'Failed to fetch or update', details: err.message });
   }
 }
