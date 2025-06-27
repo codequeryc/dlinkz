@@ -4,7 +4,6 @@ export default async function handler(req, res) {
   const { XATA_API_KEY, XATA_URL } = process.env;
 
   try {
-    // Step 1: Get record with uId: 'ohjx'
     const getRecord = async () => {
       const response = await fetch(`${XATA_URL}/tables/urls/query`, {
         method: 'POST',
@@ -27,7 +26,6 @@ export default async function handler(req, res) {
     const originalUrl = record.url;
     const recordId = record.id;
 
-    // Step 2: Follow redirects to get final URL
     const redirectCheck = await fetch(originalUrl, {
       method: 'GET',
       redirect: 'follow',
@@ -35,7 +33,6 @@ export default async function handler(req, res) {
     });
     const finalUrl = redirectCheck.url;
 
-    // Step 3: Update Xata if URL changed
     if (finalUrl !== originalUrl) {
       await fetch(`${XATA_URL}/tables/urls/data/${recordId}`, {
         method: 'PATCH',
@@ -45,32 +42,28 @@ export default async function handler(req, res) {
         },
         body: JSON.stringify({ url: finalUrl }),
       });
-      record = await getRecord(); // Re-fetch updated
+      record = await getRecord();
     }
 
     const updatedUrl = record.url;
     const baseUrl = updatedUrl.replace(/\/$/, '');
     const searchUrl = `${baseUrl}/site-1.html?to-search=raid`;
 
-    // Step 4: Fetch search page
     const searchRes = await fetch(searchUrl, {
       method: 'GET',
       headers: { 'User-Agent': 'Mozilla/5.0' }
     });
     const searchHtml = await searchRes.text();
 
-    // Step 5: Extract movie blocks
     const resultBlocks = [...searchHtml.matchAll(/<div class="A2">([\s\S]*?)<\/div>/g)];
     const results = [];
 
     for (const match of resultBlocks) {
       const block = match[1];
 
-      // Get relative link
       const linkMatch = block.match(/<a href="([^"]+)"/);
       const relativeLink = linkMatch ? linkMatch[1] : null;
 
-      // Get title
       const titleMatch = block.match(/<b>(.*?)<\/b>/);
       const title = titleMatch ? titleMatch[1].replace(/<[^>]+>/g, '') : 'No title';
 
@@ -83,11 +76,9 @@ export default async function handler(req, res) {
         });
         const postHtml = await postRes.text();
 
-        // Thumbnail
         const thumbMatch = postHtml.match(/<div class="movie-thumb">.*?<img[^>]+src="([^"]+)"/s);
         const thumbnail = thumbMatch ? thumbMatch[1] : null;
 
-        // Download link
         const downloadMatch = postHtml.match(/<div class="dlbtn">.*?<a[^>]+href="([^"]+)"[^>]*class="dl"[^>]*>/s);
         const download = downloadMatch ? downloadMatch[1] : null;
 
@@ -99,21 +90,17 @@ export default async function handler(req, res) {
         });
 
       } catch (err) {
-        results.push({
-          title,
-          link: fullPostUrl,
-          thumbnail: null,
-          download: null,
-          error: 'Failed to fetch post page'
-        });
+        // Skip broken post pages
       }
     }
 
-    // Final JSON Response
+    // ✅ Remove items without download
+    const filteredResults = results.filter(item => item.download);
+
     return res.status(200).json({
       source: searchUrl,
-      total: results.length,
-      results
+      total: filteredResults.length,
+      results: filteredResults
     });
 
   } catch (err) {
